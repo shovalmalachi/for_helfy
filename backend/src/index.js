@@ -41,32 +41,35 @@ async function main() {
   });
 
   app.post("/login", async (req, res) => {
-    const { email, password } = req.body || {};
+  const { email, password } = req.body || {};
 
-    if (!email || !password) return res.status(400).json({ error: "email and password required" });
-    if (String(password).length < 3) return res.status(400).json({ error: "password too short" });
+  if (!email || !password) {
+    return res.status(400).json({ error: "email and password required" });
+  }
 
-    const [rows] = await pool.execute(
-      "SELECT id, password_hash FROM users WHERE email=? LIMIT 1",
-      [email]
-    );
-    if (!rows.length) return res.status(401).json({ error: "invalid credentials" });
+  const [rows] = await pool.execute(
+    "SELECT id, password_hash FROM users WHERE email=? LIMIT 1",
+    [email]
+  );
 
-    const u = rows[0];
-    const userId = Number(u.id);
-    const ok = await bcrypt.compare(password, u.password_hash);
-    if (!ok) return res.status(401).json({ error: "invalid credentials" });
+  if (!rows.length) {
+    return res.status(401).json({ error: "invalid credentials" });
+  }
 
-    const token = makeToken();
-    await pool.execute(
-      "INSERT INTO tokens (user_id, token) VALUES (?, ?)",
-      [userId, token]
-    );
+  const user = rows[0];
 
-    logger.info(`login userId=${u.id} ip=${req.ip}`);
+  if (password !== user.password_hash) {
+    return res.status(401).json({ error: "invalid credentials" });
+  }
 
-    res.json({ token });
-  });
+  const token = makeToken();
+  await pool.execute(
+    "INSERT INTO tokens (user_id, token) VALUES (?, ?)",
+    [user.id, token]
+  );
+
+  res.json({ token });
+});
 
   async function requireAuth(req, res, next) {
     const token = getTokenFromHeaders(req);
@@ -94,5 +97,8 @@ async function main() {
   app.listen(PORT, () => console.log(`API listening on ${PORT}`));
 }
 
-main().catch(console.error);
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
 

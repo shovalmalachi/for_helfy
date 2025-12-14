@@ -16,3 +16,7 @@ CREATE TABLE IF NOT EXISTS tokens (
   INDEX (user_id)
 );
 
+INSERT IGNORE INTO users (email, password_hash)
+VALUES ('admin@test.com', 'admin123');
+
+
