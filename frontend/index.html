@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+<head><meta charset="utf-8" /><title>Login</title></head>
+<body>
+  <h3>Login</h3>
+  <input id="email" placeholder="email" />
+  <input id="password" placeholder="password" type="password" />
+  <button id="login">Login</button>
+
+  <h3>Me</h3>
+  <button id="me">Get /me</button>
+
+  <pre id="out"></pre>
+
+  <script>
+    const API = "http://localhost:3001";
+    let token = "";
+
+    const out = (x) => document.getElementById("out").textContent = x;
+
+    document.getElementById("login").onclick = async () => {
+      const email = document.getElementById("email").value.trim();
+      const password = document.getElementById("password").value;
+
+      if (!email || !password) return out("missing email/password");
+
+      const r = await fetch(API + "/login", {
+        method: "POST",
+        headers: {"Content-Type":"application/json"},
+        body: JSON.stringify({ email, password })
+      });
+
+      const data = await r.json();
+      if (!r.ok) return out(JSON.stringify(data, null, 2));
+
+      token = data.token;
+      out("token: " + token);
+    };
+
+    document.getElementById("me").onclick = async () => {
+      const r = await fetch(API + "/me", {
+        headers: { "Authorization": "Bearer " + token }
+      });
+      const data = await r.json();
+      out(JSON.stringify(data, null, 2));
+    };
+  </script>
+</body>
+</html>
+

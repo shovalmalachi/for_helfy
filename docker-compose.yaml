@@ -1,0 +1,115 @@
+services:
+  pd:
+    image: pingcap/pd:latest
+    command:
+      - --name=pd
+      - --data-dir=/data/pd
+      - --client-urls=http://0.0.0.0:2379
+      - --peer-urls=http://0.0.0.0:2380
+      - --advertise-client-urls=http://pd:2379
+      - --advertise-peer-urls=http://pd:2380
+      - --initial-cluster=pd=http://pd:2380
+    ports:
+      - "2379:2379"
+
+  tikv:
+    image: pingcap/tikv:latest
+    depends_on: [pd]
+    command:
+      - --addr=0.0.0.0:20160
+      - --advertise-addr=tikv:20160
+      - --data-dir=/data/tikv
+      - --pd=pd:2379
+
+  tidb:
+    image: pingcap/tidb:latest
+    depends_on: [pd, tikv]
+    command:
+      - --store=tikv
+      - --path=pd:2379
+    ports:
+      - "4000:4000"
+
+  db-init:
+    image: mysql:8
+    depends_on: [tidb]
+    volumes:
+      - ./db/schema.sql:/init/schema.sql:ro
+    entrypoint: ["/bin/sh","-c"]
+    command: >
+      "
+      echo 'waiting for TiDB...';
+      until mysql -h tidb -P 4000 -u root -e 'SELECT 1' >/dev/null 2>&1; do sleep 2; done;
+      echo 'TiDB up. applying schema...';
+      mysql -h tidb -P 4000 -u root < /init/schema.sql;
+      echo 'done';
+      "
+
+  api:
+    build: ./backend
+    command: ["node","src/index.js"]
+    depends_on: [db-init, tidb]
+    ports:
+      - "3001:3001"
+    environment:
+      PORT: 3001
+      DB_HOST: tidb
+      DB_PORT: 4000
+      DB_USER: root
+      DB_PASSWORD: ""
+      DB_NAME: appdb
+      DEFAULT_USER_EMAIL: admin@test.com
+      DEFAULT_USER_PASSWORD: admin123
+
+  web:
+    build: ./frontend
+    depends_on: [api]
+    ports:
+      - "8082:80"
+
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+
+  ticdc:
+    image: pingcap/ticdc:latest
+    depends_on:
+      - tidb
+      - kafka
+    command:
+      - /cdc
+      - server
+      - --pd=http://pd:2379
+    restart: unless-stopped
+
+
+  cdc-consumer:
+    build: ./backend
+    command: ["node", "src/consumer.js"]
+    depends_on:
+      - kafka
+      - ticdc
+    restart: unless-stopped
+
