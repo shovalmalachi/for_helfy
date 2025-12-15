@@ -45,8 +45,7 @@ docker run --rm \
   --network "$NETWORK" \
   mysql:8 \
   mysql -h tidb -P 4000 -u root appdb \
-  -e "UPDATE users SET password = UUID() WHERE email = 'test@test.com';"
-
+ -e "UPDATE users SET password = UUID() WHERE email = 'cdc@test.com';"
 echo "Database UPDATE executed."
 
 echo
@@ -56,4 +55,4 @@ sleep 5
 echo
 echo "CDC logs:"
 echo 
-docker logs --tail 30 -f "$CDC_CONTAINER" 
+docker logs --tail 100 -f "$CDC_CONTAINER" | grep '"source":"cdc-app"'

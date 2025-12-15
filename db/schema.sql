@@ -17,5 +17,5 @@ CREATE TABLE IF NOT EXISTS tokens (
 );
 
 INSERT IGNORE INTO users (email, password)
-VALUES ('test@test.com', '1234');
+VALUES ('test@test.com', '1234'),('cdc@test.com', 'cdc');
 

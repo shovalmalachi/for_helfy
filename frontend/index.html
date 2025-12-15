@@ -1,50 +1,63 @@
-<!doctype html>
-<html>
-<head><meta charset="utf-8" /><title>Login</title></head>
 <body>
   <h3>Login</h3>
   <input id="email" placeholder="email" />
   <input id="password" placeholder="password" type="password" />
-  <button id="login">Login</button>
+  <button id="login">Login & test token</button>
 
-  <h3>Me</h3>
-  <button id="me">Get /me</button>
-
+  <h3>Output</h3>
   <pre id="out"></pre>
 
   <script>
     const API = "http://localhost:3001";
     let token = "";
-
-    const out = (x) => document.getElementById("out").textContent = x;
-
+  
+    const outEl = document.getElementById("out");
+    const out = (x) => outEl.textContent = x;
+  
     document.getElementById("login").onclick = async () => {
       const email = document.getElementById("email").value.trim();
       const password = document.getElementById("password").value;
-
-      if (!email || !password) return out("missing email/password");
-
-      const r = await fetch(API + "/login", {
-        method: "POST",
-        headers: {"Content-Type":"application/json"},
-        body: JSON.stringify({ email, password })
-      });
-
-      const data = await r.json();
-      if (!r.ok) return out(JSON.stringify(data, null, 2));
-
-      token = data.token;
-      out("token: " + token);
-    };
-
-    document.getElementById("me").onclick = async () => {
-      const r = await fetch(API + "/me", {
-        headers: { "Authorization": "Bearer " + token }
-      });
-      const data = await r.json();
-      out(JSON.stringify(data, null, 2));
+  
+      token = "";
+  
+      if (!email || !password) {
+        out("authentication: false\nreason: missing email/password");
+        return;
+      }
+  
+      try {
+        const r = await fetch(API + "/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+  
+        const loginData = await r.json();
+        if (!r.ok) {
+          out(
+            "authentication: false\n" +
+            "reason: " + (loginData.error || "login failed")
+          );
+          return;
+        }
+  
+        token = loginData.token;
+  
+        const r2 = await fetch(API + "/protected", {
+          headers: { "Authorization": "Bearer " + token },
+        });
+        const protectedData = await r2.json();
+  
+        const authOk = r2.ok && protectedData.ok === true;
+  
+        out(
+          "authentication: " + authOk + "\n" +
+          "token: " + token
+        );
+      } catch (err) {
+        token = "";
+        out("authentication: false\nerror: " + err);
+      }
     };
   </script>
 </body>
-</html>
-
