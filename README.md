@@ -36,7 +36,7 @@ This project demonstrates a full-stack application with authentication, database
 
 ## Running the Project
 
-```bash
-docker compose up --build
+chmod +x bootstrap.sh
+./bootstrap.sh
 
 
