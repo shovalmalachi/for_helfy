@@ -4,7 +4,7 @@ USE appdb;
 CREATE TABLE IF NOT EXISTS users (
   id BIGINT PRIMARY KEY AUTO_RANDOM,
   email VARCHAR(255) NOT NULL UNIQUE,
-  password_hash VARCHAR(255) NOT NULL,
+  password VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -16,7 +16,6 @@ CREATE TABLE IF NOT EXISTS tokens (
   INDEX (user_id)
 );
 
-INSERT IGNORE INTO users (email, password_hash)
-VALUES ('admin@test.com', 'admin123');
-
+INSERT IGNORE INTO users (email, password)
+VALUES ('test@test.com', '1234');
 

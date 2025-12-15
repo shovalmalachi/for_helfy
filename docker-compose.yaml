@@ -58,15 +58,12 @@ services:
       DB_USER: root
       DB_PASSWORD: ""
       DB_NAME: appdb
-      DEFAULT_USER_EMAIL: admin@test.com
-      DEFAULT_USER_PASSWORD: admin123
 
   web:
     build: ./frontend
     depends_on: [api]
     ports:
       - "8082:80"
-
 
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
@@ -84,26 +81,50 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:29092
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-
+      KAFKA_LISTENERS: |
+        INTERNAL://0.0.0.0:29092,
+        EXTERNAL://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: |
+        INTERNAL://kafka:29092,
+        EXTERNAL://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: |
+        INTERNAL:PLAINTEXT,
+        EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-
 
   ticdc:
     image: pingcap/ticdc:latest
     depends_on:
+      - pd
       - tidb
       - kafka
     command:
       - /cdc
       - server
       - --pd=http://pd:2379
+      - --addr=0.0.0.0:8300
+      - --advertise-addr=ticdc:8300
     restart: unless-stopped
 
+  ticdc-init:
+    image: pingcap/ticdc:latest
+    depends_on:
+      - ticdc
+      - kafka
+    entrypoint: ["/bin/sh","-c"]
+    command: >
+      "
+      echo 'waiting for TiCDC API...';
+      until /cdc cli changefeed list --server=http://ticdc:8300 >/dev/null 2>&1; do sleep 2; done;
+      echo 'creating changefeed...';
+      /cdc cli changefeed create
+      --server=http://ticdc:8300
+      --sink-uri='kafka://kafka:29092/appdb-cdc?protocol=open-protocol'
+      --changefeed-id=appdb-cdc;
+      echo 'cdc changefeed created';
+      "
+      
 
   cdc-consumer:
     build: ./backend
