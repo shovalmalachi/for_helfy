@@ -39,3 +39,4 @@ This project demonstrates a full-stack application with authentication, database
 ```bash
 docker compose up --build
 
+
